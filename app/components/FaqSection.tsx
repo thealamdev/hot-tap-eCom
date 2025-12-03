@@ -1,19 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Minus, MessageCircle } from "lucide-react";
-
-const faqs = [
-    { question: "How do I place an order?", answer: "Simply choose your product, fill out the order form with your details, and our team will contact you within 24 hours to confirm and process your order." },
-    { question: "What payment methods do you accept?", answer: "We accept all major credit cards, PayPal, bank transfers, and cryptocurrency payments for maximum flexibility." },
-    { question: "Do you offer refunds?", answer: "Yes, we offer a 30-day money-back guarantee if you're not completely satisfied with your purchase." },
-    { question: "How long does delivery take?", answer: "Standard delivery takes 5-10 business days. Express shipping (2-3 days) is available at checkout." },
-    { question: "Is customer support included?", answer: "Absolutely! Lifetime customer support is included with every purchase at no extra cost." },
-    { question: "Can I upgrade my plan later?", answer: "Yes, you can upgrade at any time. The price difference will be prorated." },
-];
+import { QuestionInterface } from "@/types/QuestionInterface";
+import { QuestionService } from "@/services/QuestionService";
 
 export default function () {
     const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+    const [questions, setQuestions] = useState<QuestionInterface[]>([]);
+    const [loading, setLoading] = useState<boolean>(true);
+
+    useEffect(() => {
+        const res = QuestionService()
+            .then((data) => setQuestions(data))
+            .finally(() => setLoading(false));
+    }, []);
 
     return (
         <section className="py-20 bg-gray-50">
@@ -41,7 +43,7 @@ export default function () {
                 {/* Right Side - Accordion + Support Card */}
                 <div className="space-y-6">
                     {/* FAQ Accordion */}
-                    {faqs.map((faq, index) => (
+                    {questions.map((faq, index) => (
                         <div
                             key={index}
                             className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-md"
@@ -51,7 +53,7 @@ export default function () {
                                 className="w-full px-8 py-6 flex items-center justify-between text-left group"
                             >
                                 <span className="text-lg font-medium text-gray-900 group-hover:text-orange-600 transition">
-                                    {faq.question}
+                                    {faq.title}
                                 </span>
                                 <span className="ml-4 text-orange-500">
                                     {openIndex === index ? (
@@ -68,7 +70,7 @@ export default function () {
                                     }`}
                             >
                                 <div className="px-8 pb-6">
-                                    <p className="text-gray-600 leading-relaxed">{faq.answer}</p>
+                                    <p className="text-gray-600 leading-relaxed">{faq.quote}</p>
                                 </div>
                             </div>
                         </div>

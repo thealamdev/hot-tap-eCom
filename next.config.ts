@@ -8,7 +8,7 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'www.matteralpha.com',
+        hostname: 'static.readdy.ai',
       },
       {
         protocol: 'https',
