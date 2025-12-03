@@ -1,16 +1,128 @@
-// components/OrderForm.tsx
 "use client";
 
-import { useState } from "react";
-import { User, Package, Truck, Check } from "lucide-react";
+import { useEffect, useState } from "react";
+import { User, Package, Truck, Check, Wallet, ShoppingCart, X } from "lucide-react";
+import { ProductInterface } from "@/types/ProductInterface";
+import Image from "next/image";
+
+interface CartItem extends ProductInterface {
+    quantity: 1;
+}
 
 export default function OrderForm() {
-    const [deliveryMethod, setDeliveryMethod] = useState("standard");
+    const [deliveryMethod, setDeliveryMethod] = useState("inside_dhaka");
+    const [paymentMethod] = useState("cash_on_delivery");
+    const [cartItems, setCartItems] = useState<CartItem[]>([]);
+    const [submitting, setSubmitting] = useState<boolean>(false);
+
+    const [formData, setFormData] = useState({
+        name: "",
+        mobile: "",
+        address: "",
+        specialRequests: ""
+    });
+
+    useEffect(() => {
+        const loadCart = () => {
+            const stored = sessionStorage.getItem('cart');
+            if (stored) {
+                const items: CartItem[] = JSON.parse(stored);
+                setCartItems(items);
+            }
+        };
+
+        loadCart();
+
+        const handleCartUpdate = () => loadCart();
+        window.addEventListener('cartUpdated', handleCartUpdate);
+
+        return () => window.removeEventListener('cartUpdated', handleCartUpdate);
+    }, []);
+
+    const removeItem = (id: string) => {
+        const updated = cartItems.filter((item: any) => item.id !== id);
+        setCartItems(updated);
+        sessionStorage.setItem('cart', JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent('cartUpdated'));
+    };
+
+    const getDeliveryPrice = () => {
+        switch (deliveryMethod) {
+            case "inside_dhaka": return 70;
+            case "outside_dhaka": return 100;
+            case "outside_bangladesh": return 130;
+            default: return 0;
+        }
+    };
+
+    const subtotal = cartItems.reduce((sum, item) => sum + Number(item.price), 0);
+    const total = subtotal + getDeliveryPrice();
+
+    const generateOrderId = () => {
+        return 'INV-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 5).toUpperCase();
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (cartItems.length === 0) {
+            alert("Please add at least one product.");
+            return;
+        }
+
+        setSubmitting(true);
+
+        const orderId = generateOrderId();
+        const productList = cartItems.map(p => p.title).join(', ');
+
+        const submissionData = {
+            id: orderId,
+            name: formData.name,
+            mobile: formData.mobile,
+            address: formData.address,
+            shipping: deliveryMethod === "inside_dhaka" ? "Inside Dhaka" :
+                deliveryMethod === "outside_dhaka" ? "Outside Dhaka" : "Outside Bangladesh",
+            product: productList,
+            quantity: cartItems.length,
+            price: subtotal,
+            subtotal: subtotal,
+            total: total,
+            payment: getDeliveryPrice(),
+        };
+
+        try {
+            const response = await fetch("/api/orders", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(submissionData)
+            });
+
+            if (response.ok) {
+                alert("Order placed successfully! ✅ Your Order ID: " + orderId);
+                setFormData({ name: "", mobile: "", address: "", specialRequests: "" });
+                setCartItems([]);
+                sessionStorage.removeItem('cart');
+                window.dispatchEvent(new CustomEvent('cartUpdated'));
+            } else {
+                alert("Failed to place order. Please try again.");
+            }
+        } catch (error) {
+            console.error("Submission error:", error);
+            alert("An error occurred. Please try again.");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const BDTFormatter = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'BDT',
+        minimumFractionDigits: 0,
+    });
 
     return (
-        <section className="py-20 bg-gray-50">
+        <section id="order-form" className="py-20 bg-gray-50 scroll-mt-20">
             <div className="max-w-7xl mx-auto px-6">
-                {/* Header */}
                 <div className="text-center mb-12">
                     <p className="text-sm font-semibold text-orange-500 uppercase tracking-wider">
                         Place your order
@@ -19,12 +131,12 @@ export default function OrderForm() {
                         Complete Your Order
                     </h2>
                     <p className="mt-4 text-lg text-gray-600">
-                        Fill in your details below and we’ll get your order processed right away
+                        Fill in your details below and we'll process your order
                     </p>
                 </div>
 
-                <form className="grid md:grid-cols-2 gap-10 bg-white rounded-3xl p-8 md:p-12">
-                    {/* === LEFT COLUMN - Billing Details === */}
+                <form onSubmit={handleSubmit} className="grid md:grid-cols-2 gap-10 bg-white rounded-3xl p-8 md:p-12">
+                    {/* Left: Billing */}
                     <div className="space-y-8">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -33,153 +145,130 @@ export default function OrderForm() {
                             <h3 className="text-xl font-semibold text-gray-900">Billing Details</h3>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-6">
-                            <input
-                                type="text"
-                                placeholder="Full Name *"
-                                defaultValue="John Doe"
-                                className="w-full px-5 py-4 border text-gray-700 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                required
-                            />
-                            <input
-                                type="email"
-                                placeholder="Email Address *"
-                                defaultValue="john@example.com"
-                                className="w-full px-5 py-4 border text-gray-700 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                required
-                            />
-                            <input
-                                type="tel"
-                                placeholder="Phone Number *"
-                                defaultValue="+1 (555) 000-0000"
-                                className="w-full px-5 py-4 border text-gray-700 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                required
-                            />
-                            <input
-                                type="text"
-                                placeholder="Street Address *"
-                                defaultValue="123 Main Street"
-                                className="w-full px-5 py-4 border text-gray-700 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                required
-                            />
+                        <div className="grid gap-6">
+                            <input type="text" placeholder="Full Name *" required value={formData.name}
+                                onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                className="w-full px-5 py-4 border text-gray-800 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500" />
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <input
-                                    type="text"
-                                    placeholder="City *"
-                                    defaultValue="New York"
-                                    className="px-5 py-4 border text-gray-700 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                    required
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="ZIP Code *"
-                                    defaultValue="10001"
-                                    className="px-5 py-4 border text-gray-700 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                    required
-                                />
+                            <input type="tel" placeholder="Phone Number *" required value={formData.mobile}
+                                onChange={e => setFormData({ ...formData, mobile: e.target.value })}
+                                className="w-full px-5 py-4 border text-gray-800 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500" />
+
+                            <textarea rows={2} placeholder="Street Address *" required value={formData.address}
+                                onChange={e => setFormData({ ...formData, address: e.target.value })}
+                                className="w-full px-5 py-4 border text-gray-800 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500" />
+
+                            <textarea rows={4} placeholder="Special Requests (optional)" value={formData.specialRequests}
+                                onChange={e => setFormData({ ...formData, specialRequests: e.target.value })}
+                                className="w-full px-5 py-4 border text-gray-800 border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                maxLength={500} />
+
+                            <div className="mt-10">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <Truck className="w-5 h-5 text-orange-600" />
+                                    <h3 className="text-xl font-semibold text-gray-900">Shipping</h3>
+                                </div>
+                                <div className="space-y-4">
+                                    {[
+                                        { id: "inside_dhaka", label: "ঢাকা সিটির মধ্যে:", price: "70৳" },
+                                        { id: "outside_dhaka", label: "ঢাকা পার্বর্তী এলাকায়:", price: "100৳" },
+                                        { id: "outside_bangladesh", label: "ঢাকা বাহিরে:", price: "130৳" },
+                                    ].map(option => (
+                                        <label key={option.id}
+                                            className={`flex items-center justify-between p-5 border rounded-xl cursor-pointer transition-all ${deliveryMethod === option.id ? "border-orange-500 bg-orange-50" : "border-gray-200 hover:border-gray-300"}`}>
+                                            <div className="flex items-center gap-4">
+                                                <input type="radio" name="delivery" value={option.id}
+                                                    checked={deliveryMethod === option.id}
+                                                    onChange={e => setDeliveryMethod(e.target.value)}
+                                                    className="w-5 h-5 text-orange-600" />
+                                                <p className="font-medium text-gray-900">{option.label}</p>
+                                            </div>
+                                            <span className="font-semibold text-gray-900">{option.price}</span>
+                                        </label>
+                                    ))}
+                                </div>
                             </div>
-
-                            <input
-                                type="text"
-                                placeholder="Country *"
-                                defaultValue="United States"
-                                className="w-full px-5 py-4 border text-gray-700 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                required
-                            />
                         </div>
                     </div>
 
-                    {/* === RIGHT COLUMN - Order & Delivery === */}
+                    {/* Right: Order Details */}
                     <div className="space-y-8">
-                        {/* Order Details */}
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                                <Package className="w-5 h-5 text-orange-600" />
-                            </div>
+                            <Package className="w-5 h-5 text-orange-600" />
                             <h3 className="text-xl font-semibold text-gray-900">Order Details</h3>
                         </div>
 
-                        <select
-                            defaultValue=""
-                            className="w-full px-5 py-4 border text-gray-700 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                            required
-                        >
-                            <option value="" disabled>
-                                Choose a product... *
-                            </option>
-                            <option>Premium Plan - $99/mo</option>
-                            <option>Enterprise Plan - $299/mo</option>
-                            <option>Lifetime Access - $999</option>
-                        </select>
-
-                        <input
-                            type="number"
-                            placeholder="Quantity *"
-                            defaultValue="1"
-                            min="1"
-                            className="w-full px-5 py-4 border text-gray-700 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                            required
-                        />
-
-                        <textarea
-                            rows={4}
-                            placeholder="Special Requests (optional)"
-                            className="w-full px-5 py-4 border text-gray-700 border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-orange-500"
-                            maxLength={500}
-                        />
-
-                        {/* Delivery Method */}
-                        <div className="mt-10">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                                    <Truck className="w-5 h-5 text-orange-600" />
+                        {cartItems.length > 0 ? (
+                            <div className="border border-gray-200 rounded-xl p-6 max-h-96 overflow-y-auto space-y-4">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <ShoppingCart className="w-5 h-5 text-orange-600" />
+                                    <h4 className="font-semibold text-gray-900">Your Cart ({cartItems.length} items)</h4>
                                 </div>
-                                <h3 className="text-xl font-semibold text-gray-900">Delivery Method</h3>
-                            </div>
 
-                            <div className="space-y-4">
-                                {[
-                                    { id: "standard", label: "Standard Delivery", time: "5-7 business days", price: "Free" },
-                                    { id: "express", label: "Express Delivery", time: "2-3 business days", price: "$15" },
-                                    { id: "overnight", label: "Overnight Delivery", time: "Next business day", price: "$30" },
-                                ].map((option) => (
-                                    <label
-                                        key={option.id}
-                                        className={`flex items-center justify-between p-5 border rounded-xl cursor-pointer transition-all ${deliveryMethod === option.id
-                                                ? "border-orange-500 bg-orange-50"
-                                                : "border-gray-200 hover:border-gray-300"
-                                            }`}
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <input
-                                                type="radio"
-                                                name="delivery"
-                                                value={option.id}
-                                                checked={deliveryMethod === option.id}
-                                                onChange={(e) => setDeliveryMethod(e.target.value)}
-                                                className="w-5 h-5 text-orange-600 focus:ring-orange-500"
-                                            />
-                                            <div>
-                                                <p className="font-medium text-gray-900">{option.label}</p>
-                                                <p className="text-sm text-gray-500">{option.time}</p>
-                                            </div>
+                                {cartItems.map(item => (
+                                    <div key={item.id} className="flex gap-4 p-4 bg-gray-50 rounded-lg">
+                                        <div className="relative w-24 h-24 shrink-0">
+                                            <Image src={item.image_url} alt={item.title} fill className="object-cover rounded-lg" />
                                         </div>
-                                        <span className="font-semibold text-gray-900">{option.price}</span>
-                                    </label>
+                                        <div className="flex-1">
+                                            <p className="font-medium text-gray-900">{item.title}</p>
+                                            <p className="text-orange-600 font-semibold mt-1">
+                                                {BDTFormatter.format(item.price)}
+                                            </p>
+                                        </div>
+                                        <button type="button" onClick={() => removeItem(item.id)}
+                                            className="text-red-500 hover:text-red-700">
+                                            <X className="w-5 h-5" />
+                                        </button>
+                                    </div>
                                 ))}
                             </div>
+                        ) : (
+                            <div className="text-center py-12 text-gray-500">
+                                <ShoppingCart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                                <p>Your cart is empty</p>
+                            </div>
+                        )}
+
+                        {/* Payment Info */}
+                        <div className="mt-10">
+                            <div className="flex items-center gap-3 mb-6">
+                                <Wallet className="w-5 h-5 text-orange-600" />
+                                <h3 className="text-xl font-semibold text-gray-900">Payment Method</h3>
+                            </div>
+                            <div className="p-5 border border-orange-500 bg-orange-50 rounded-xl">
+                                <p className="font-medium text-gray-900">Cash on Delivery</p>
+                            </div>
                         </div>
+
+                        {/* Order Summary */}
+                        {cartItems.length > 0 && (
+                            <div className="mt-6 p-6 bg-gray-50 rounded-xl space-y-3">
+                                <h4 className="font-semibold text-gray-900">Order Summary</h4>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-900">Subtotal:</span>
+                                    <span className="font-medium text-gray-900">{BDTFormatter.format(subtotal)}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-900">Delivery:</span>
+                                    <span className="font-medium text-gray-900">{getDeliveryPrice()}৳</span>
+                                </div>
+                                <div className="pt-3 border-t border-gray-200 flex justify-between">
+                                    <span className="font-bold text-gray-900">Total:</span>
+                                    <span className="font-bold text-orange-600 text-lg">
+                                        {BDTFormatter.format(total)}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
-                    {/* === Submit Button === */}
+                    {/* Submit */}
                     <div className="md:col-span-2 flex justify-center mt-10">
-                        <button
-                            type="submit"
-                            className="group inline-flex items-center gap-3 px-12 py-5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-lg rounded-full shadow-lg transition-all duration-300"
-                        >
+                        <button type="submit" disabled={submitting || cartItems.length === 0}
+                            className="inline-flex items-center gap-3 px-12 py-5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-lg rounded-full shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                             <Check className="w-6 h-6" />
-                            Place Order
+                            {submitting ? "Processing..." : "Place Order"}
                         </button>
                     </div>
                 </form>

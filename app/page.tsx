@@ -8,10 +8,10 @@ export default function HomePage() {
   return (
     <main>
       <Banner />
-      <Products />
       <OrderingProcess />
-      <FaqSection />
+      <Products />
       <OrderForm />
+      <FaqSection />
     </main>
   );
 }
